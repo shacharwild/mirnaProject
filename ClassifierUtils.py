@@ -22,12 +22,62 @@ from sklearn.svm import LinearSVC
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, AdaBoostClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import confusion_matrix
+from sklearn.svm import SVC
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_regression
+from sklearn.ensemble import ExtraTreesClassifier
+import matplotlib.pyplot as plt
 
 
 
 
+# function that saves and displays features importance list
+def makeImportanceList(pos_files, list_of_neg_files):
+    f0_pos = pos_files[0]
+    f0_neg = corespondeing_neg_file(f0_pos, list_of_neg_files)
+    f1_pos = pos_files[1]
+    f1_neg = corespondeing_neg_file(f1_pos, list_of_neg_files)
+
+    col_to_drop = ['Unnamed: 0', 'Source', 'Organism', 'microRNA_name', 'miRNA sequence',
+                   'target sequence', 'number of reads', 'mRNA_name', 'mRNA_start',
+                   'mRNA_end', 'full_mrna', 'site_start']
+
+    if f0_pos == f1_pos:  # one organism. normal case.
+        pos = pd.read_csv(f0_pos)
+        neg = pd.read_csv(f0_neg)
+        X = pd.concat([pos, neg])
+        X.reset_index(drop=True, inplace=True)
+        X.drop(col_to_drop, axis=1, inplace=True)
+        for c in X.columns:
+            if c.find("Unnamed") != -1:
+                print(" ***************** delete")
+
+                X.drop([c], axis=1, inplace=True)
+
+        y_pos = pd.DataFrame(np.ones((pos.shape[0], 1)))
+        y_neg = pd.DataFrame(np.zeros((neg.shape[0], 1)))
+        Y = pd.concat([y_pos, y_neg])
+        Y.reset_index(drop=True, inplace=True)
+
+    model = ExtraTreesClassifier()
+    model.fit(X, Y)
+
+    # display top 20 top features
+    feat_importances = pd.Series(model.feature_importances_, index=X.columns)
+    feat_importances.nlargest(10).plot(kind='barh')
+    plt.show()
 
 
+
+# function that performes features selection
+def ReduceFeatures(X,Y, featureSelection):
+    chi2_selector = SelectKBest(f_regression, k=150)
+    X_kbest = chi2_selector.fit_transform(X, Y)
+    return X_kbest
+
+
+
+# function that find the corresponding negative data file, for a positive data one
 def corespondeing_neg_file (pos_file, l):
     term_to_find = str(pos_file.stem).split("_2019")[0]
     term_to_find = term_to_find.replace("pos", "neg")
@@ -41,8 +91,8 @@ def corespondeing_neg_file (pos_file, l):
 
 
 
-
-def train_test_prepare(pos_files, list_of_neg_files, test_size=0.2, r_state=42):
+# make train and test groups
+def train_test_prepare(featureSelection,pos_files, list_of_neg_files, test_size=0.2, r_state=42):
     f0_pos = pos_files[0]
     f0_neg = corespondeing_neg_file(f0_pos, list_of_neg_files)
     f1_pos = pos_files[1]
@@ -64,10 +114,16 @@ def train_test_prepare(pos_files, list_of_neg_files, test_size=0.2, r_state=42):
 
                 X.drop([c], axis=1, inplace=True)
 
+
+
         y_pos = pd.DataFrame(np.ones((pos.shape[0], 1)))
         y_neg = pd.DataFrame(np.zeros((neg.shape[0], 1)))
         Y = pd.concat([y_pos, y_neg])
         Y.reset_index(drop=True, inplace=True)
+
+        # check if to do feature selection:
+        if featureSelection!='no':
+            X =ReduceFeatures(X, Y, featureSelection)
 
         X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=test_size ,random_state=r_state)
         return  X_train, X_test, y_train.values.ravel(), y_test.values.ravel()
@@ -110,6 +166,7 @@ def train_test_prepare(pos_files, list_of_neg_files, test_size=0.2, r_state=42):
         return  X_train, X_test, y_train.values.ravel(), y_test.values.ravel()
 
 
+# run the machine learning algorithm
 def model_run(training_config, train_X, test_x, train_y, test_y, scoring = "accuracy"):
     best_est = []
     exp_to_run = training_config.keys()
@@ -140,7 +197,7 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring = "accu
         results['accuracy'].append(acc)
         JsonLog.add_to_json("{}_model_params".format(name), model.get_params())
 
-        try:
+        try:  # if the model is random forest, then make a features importance list
             feature_importances = pd.DataFrame(best_clf.feature_importances_, index=train_X.columns,
                                                columns=['importance'])
             a = feature_importances.sort_values('importance', ascending=False)
@@ -171,21 +228,28 @@ def main():
     vienna_all_options = list(itertools.product(all_pos_vienna, all_pos_vienna))
 
     training_config = {
-        'rf': {
-            'clf': RandomForestClassifier(),
-            'parameters': {
-                'n_estimators': [10, 50, 200, 500],
-                'criterion': ['gini', 'entropy'],
-                'max_depth': [2, 4, 10, 20],
-                'min_samples_leaf': [2, 3],
-            },
-            'n_jobs': 4,
-            'one_hot': False
-        }
+      #  'rf': {
+      #      'clf': RandomForestClassifier(),
+      #      'parameters': {
+      #          'n_estimators': [10, 50, 200, 500],
+      #          'criterion': ['gini', 'entropy'],
+      #          'max_depth': [2, 4, 10, 20],
+      #          'min_samples_leaf': [2, 3],
+      #      },
+      #      'n_jobs': 4,
+      #      'one_hot': False
+      #  }
+        'rbf Kernel': {
+                   'clf': SVC(),
+                   'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
+                     'C': [0.001, 0.10, 0.1, 10, 25, 50, 100, 1000]}
+               }
+
 
     }
     dm="vienna" # duplex method
 
+    # go through all data sets pairs (For different organisms combinations)
     for files_pair in vienna_all_options:
         source =[]
         for f in files_pair:
@@ -201,7 +265,7 @@ def main():
         JsonLog.add_to_json("duplex_method", dm)
 
 
-        X_train, X_test, y_train, y_test = train_test_prepare(files_pair, all_neg, test_size=0.2, r_state=42)
+        X_train, X_test, y_train, y_test = train_test_prepare('no',files_pair, all_neg, test_size=0.2, r_state=42)
         JsonLog.add_to_json("train size", X_train.shape[0])
         JsonLog.add_to_json("test size", X_test.shape[0])
         best_est = model_run(training_config, X_train, X_test, y_train, y_test, scoring="accuracy")
