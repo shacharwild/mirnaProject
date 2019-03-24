@@ -200,10 +200,11 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring = "accu
         try:  # if the model is random forest, then make a features importance list
             feature_importances = pd.DataFrame(best_clf.feature_importances_, index=train_X.columns,
                                                columns=['importance'])
+
             a = feature_importances.sort_values('importance', ascending=False)
+            a.to_excel("featuresList_human_Mapping.xlsx")
             print (a.head(10))
             JsonLog.add_to_json("{}_feature_importances".format(name), a.to_dict())
-
 
         except Exception:
             print ("This model has no attribute 'feature_importances_")
@@ -215,9 +216,9 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring = "accu
 
 
 def main():
-    log_dir = Path("Data/Results") # location of saved results logs
-    input_pos = Path("Data/pos") # location of positive data
-    input_neg = Path("Data/neg") # location of negative data
+    log_dir = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping") # location of saved results logs
+    input_pos = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping") # location of positive data
+    input_neg = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping\\neg") # location of negative data
     all_neg = list(input_neg.iterdir())   # make list of all negative files
 
     all_pos = list(input_pos.iterdir()) # make list of all positive files
@@ -228,29 +229,29 @@ def main():
     vienna_all_options = list(itertools.product(all_pos_vienna, all_pos_vienna))
 
     training_config = {
-      #  'rf': {
-      #      'clf': RandomForestClassifier(),
-      #      'parameters': {
-      #          'n_estimators': [10, 50, 200, 500],
-      #          'criterion': ['gini', 'entropy'],
-      #          'max_depth': [2, 4, 10, 20],
-      #          'min_samples_leaf': [2, 3],
-      #      },
-      #      'n_jobs': 4,
-      #      'one_hot': False
-      #  }
+       'rf': {
+           'clf': RandomForestClassifier(),
+           'parameters': {
+               'n_estimators': [10, 50, 200, 500],
+               'criterion': ['gini', 'entropy'],
+               'max_depth': [2, 4, 10, 20],
+               'min_samples_leaf': [2, 3],
+           },
+           'n_jobs': 4,
+           'one_hot': False
+       }
        # 'rbf Kernel': {
        #            'clf': SVC(),
        #            'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
        #              'C': [0.001, 0.10, 0.1, 10, 25, 50, 100, 1000]}
        #        }
-        'logit': {
-                     'clf': LogisticRegression(),
-                     'parameters': {
-                         'penalty': ['l1', 'l2'],
-                    'C': list(np.arange(0.5, 8.0, 0.1))}
-
-        }
+       #  'logit': {
+       #               'clf': LogisticRegression(),
+       #               'parameters': {
+       #                   'penalty': ['l1', 'l2'],
+       #              'C': list(np.arange(0.5, 8.0, 0.1))}
+       #
+       #  }
     }
     dm="vienna" # duplex method
 
@@ -276,8 +277,49 @@ def main():
         best_est = model_run(training_config, X_train, X_test, y_train, y_test, scoring="accuracy")
         #makeImportanceList(files_pair,all_neg)
 
+def intersectList(path,list1,list2):
+    dfHuman = pd.read_excel(path+'\\'+list1+'.xlsx')
+    dfMouse = pd.read_excel(path+'\\'+list2+'.xlsx')
+    featuresListHuman = dfHuman.index.tolist()
+    print(len(featuresListHuman))
+    featuresListMouse = dfMouse.index.tolist()
+    print(len(featuresListMouse))
+    a= featuresListHuman[:50]
+    b=featuresListMouse[:50]
+    print(len(a))
+    result = intersection(a,b)
+
+    # save to excel
+    df=pd.DataFrame()
+    df['common features'] = result
+    df.to_excel('common_features'+'\\'+list1+''+list2+'.xlsx')
+
+    print (len(result))
+
+def commonFeatures(path):
+    input=Path(path)
+    all_lists = list(input.iterdir())
+    all_options = list(itertools.product(all_lists, all_lists))
+    for files_pair in all_options:
+        source =[]
+        for f in files_pair:
+            tmp = str(f.stem).split("_2019")[0]
+            source.append(tmp.split("_Data")[0])
+
+        list1 = source[0]
+        list2 = source[1]
+        if (list1 != list2):
+            intersectList(path, list1, list2)
+
+
+
+def intersection(lst1, lst2):
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    # intersectList()
+    commonFeatures('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
 
