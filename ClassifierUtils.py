@@ -239,13 +239,18 @@ def main():
       #      'n_jobs': 4,
       #      'one_hot': False
       #  }
-        'rbf Kernel': {
-                   'clf': SVC(),
-                   'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
-                     'C': [0.001, 0.10, 0.1, 10, 25, 50, 100, 1000]}
-               }
+       # 'rbf Kernel': {
+       #            'clf': SVC(),
+       #            'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
+       #              'C': [0.001, 0.10, 0.1, 10, 25, 50, 100, 1000]}
+       #        }
+        'logit': {
+                     'clf': LogisticRegression(),
+                     'parameters': {
+                         'penalty': ['l1', 'l2'],
+                    'C': list(np.arange(0.5, 8.0, 0.1))}
 
-
+        }
     }
     dm="vienna" # duplex method
 
@@ -269,7 +274,7 @@ def main():
         JsonLog.add_to_json("train size", X_train.shape[0])
         JsonLog.add_to_json("test size", X_test.shape[0])
         best_est = model_run(training_config, X_train, X_test, y_train, y_test, scoring="accuracy")
-
+        #makeImportanceList(files_pair,all_neg)
 
 
 
