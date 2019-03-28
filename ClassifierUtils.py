@@ -220,7 +220,6 @@ def main():
     input_pos = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping") # location of positive data
     input_neg = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping\\neg") # location of negative data
     all_neg = list(input_neg.iterdir())   # make list of all negative files
-
     all_pos = list(input_pos.iterdir()) # make list of all positive files
     all_pos_valid = [x for x in all_pos if x.match("*_pos_valid_seeds_*")] # choose all valid seeds
     all_pos_vienna = [x for x in all_pos_valid if x.match("*vienna*")]
@@ -316,6 +315,7 @@ def commonFeatures(path):
 def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in lst2]
     print (lst3)
+    print (len(lst3))
     return lst3
 
 def intersection_ExcelFiles(path):
@@ -324,8 +324,8 @@ def intersection_ExcelFiles(path):
     df1 = pd.read_excel(all_lists[0])
     df2 = pd.read_excel(all_lists[1])
     list1 = df1.index.tolist()
-    # list2 = df2.tolist()
-    list2 = [df2['Feature name'].tolist()]
+    list2 = df1.index.tolist()
+    # list2 = df2['Feature name'].tolist() --- used when there is a column name
     list1=list1[:50]
     list2 = list2[:50]
     intersection(list1,list2)
