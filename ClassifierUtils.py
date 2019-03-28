@@ -1,7 +1,10 @@
 from pathlib import Path
 
+from functools import reduce
+
 import JsonLog
 import itertools
+import functools
 from multiprocessing import Pool
 import multiprocessing
 
@@ -88,7 +91,14 @@ def corespondeing_neg_file (pos_file, l):
             return x
     raise Exception ("Don't find the corespondeing_neg_file {}".format(pos_file))
 
-
+def getFeatures50(path):
+    input = Path(path)
+    all_lists = list(input.iterdir())
+    df1 = pd.read_excel(all_lists[0])
+    list2 = df1['common features'].tolist()
+    # list2 = df1.index.tolist()
+    list2 = list2[:50]
+    return list2
 
 
 # make train and test groups
@@ -104,17 +114,18 @@ def train_test_prepare(featureSelection,pos_files, list_of_neg_files, test_size=
 
     if f0_pos == f1_pos: # one organism. normal case.
         pos = pd.read_csv(f0_pos)
+        featurelist = getFeatures50('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists\\test')
+        pos=pd.DataFrame(pos, columns=featurelist)
         neg = pd.read_csv(f0_neg)
+        neg = pd.DataFrame(neg, columns=featurelist)
         X = pd.concat([pos, neg])
         X.reset_index(drop=True, inplace=True)
-        X.drop(col_to_drop, axis=1, inplace=True)
+        # X.drop(col_to_drop, axis=1, inplace=True)
         for c in X.columns:
             if c.find ("Unnamed")!=-1:
                 print (" ***************** delete")
 
                 X.drop([c], axis=1, inplace=True)
-
-
 
         y_pos = pd.DataFrame(np.ones((pos.shape[0], 1)))
         y_neg = pd.DataFrame(np.zeros((neg.shape[0], 1)))
@@ -216,9 +227,9 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring = "accu
 
 
 def main():
-    log_dir = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping") # location of saved results logs
-    input_pos = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping") # location of positive data
-    input_neg = Path("d:\\documents\\users\\sheinbey\\Downloads\\Features\\to run pairs\\human_Mapping\\neg") # location of negative data
+    log_dir = Path("C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\Data") # location of saved results logs
+    input_pos = Path("C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\Data\\pos") # location of positive data
+    input_neg = Path("C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\Data\\neg") # location of negative data
     all_neg = list(input_neg.iterdir())   # make list of all negative files
     all_pos = list(input_pos.iterdir()) # make list of all positive files
     all_pos_valid = [x for x in all_pos if x.match("*_pos_valid_seeds_*")] # choose all valid seeds
@@ -238,12 +249,12 @@ def main():
            },
            'n_jobs': 4,
            'one_hot': False
-       }
-       # 'rbf Kernel': {
-       #            'clf': SVC(),
-       #            'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
-       #              'C': [0.001, 0.10, 0.1, 10, 25, 50, 100, 1000]}
-       #        }
+       },
+       'rbf Kernel': {
+                  'clf': SVC(),
+                  'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
+                    'C': [0.001, 0.10, 0.1, 10, 25, 50, 100, 1000]}
+              }
        #  'logit': {
        #               'clf': LogisticRegression(),
        #               'parameters': {
@@ -318,20 +329,34 @@ def intersection(lst1, lst2):
     print (len(lst3))
     return lst3
 
+def multipleIntersection(path):
+    input = Path(path)
+    all_lists = list(input.iterdir())
+    lists=list()
+    for file in all_lists:
+        df= pd.read_excel(file)
+        list1 = df.index.tolist()
+        list1 = list1[:50]
+        lists.append(list1)
+    result = list(reduce(set.intersection, [set(item) for item in lists]))
+    df = pd.DataFrame()
+    df['common features'] = result
+    df.to_excel('common_features for all organisms .xlsx')
+
 def intersection_ExcelFiles(path):
     input = Path(path)
     all_lists = list(input.iterdir())
     df1 = pd.read_excel(all_lists[0])
     df2 = pd.read_excel(all_lists[1])
     list1 = df1.index.tolist()
-    list2 = df1.index.tolist()
+    list2 = df2.index.tolist()
     # list2 = df2['Feature name'].tolist() --- used when there is a column name
     list1=list1[:50]
     list2 = list2[:50]
     intersection(list1,list2)
 
 if __name__ == "__main__":
-    # main()
+     main()
     # intersectList()
     # commonFeatures('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
-    intersection_ExcelFiles('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists\\test')
+    # multipleIntersection('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
