@@ -315,11 +315,23 @@ def commonFeatures(path):
 
 def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in lst2]
+    print (lst3)
     return lst3
 
+def intersection_ExcelFiles(path):
+    input = Path(path)
+    all_lists = list(input.iterdir())
+    df1 = pd.read_excel(all_lists[0])
+    df2 = pd.read_excel(all_lists[1])
+    list1 = df1.index.tolist()
+    # list2 = df2.tolist()
+    list2 = [df2['Feature name'].tolist()]
+    list1=list1[:50]
+    list2 = list2[:50]
+    intersection(list1,list2)
 
 if __name__ == "__main__":
     # main()
     # intersectList()
-    commonFeatures('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
-
+    # commonFeatures('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
+    intersection_ExcelFiles('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists\\test')
