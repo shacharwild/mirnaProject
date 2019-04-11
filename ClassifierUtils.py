@@ -7,10 +7,10 @@ import itertools
 import functools
 from multiprocessing import Pool
 import multiprocessing
-
+import shap
 import pandas as pd
 import numpy as np
-import xgboost as xgb
+# import xgboost as xgb
 import warnings
 # from sklearn.model_selection import train_test_split
 # from sklearn.metrics import f1_score, accuracy_score
@@ -95,7 +95,10 @@ def ReduceFeatures(train_x,train_y,test_x,test_y,num_features):
 
     return train_x, test_x
 
-
+def shap_features(model,X, title):
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X)
+    shap.summary_plot(shap_values, X)
 # function that find the corresponding negative data file, for a positive data one
 def corespondeing_neg_file(pos_file, l):
     term_to_find = str(pos_file.stem).split("_2019")[0]
@@ -146,10 +149,10 @@ def train_test_prepare(featureSelection, pos_files, list_of_neg_files, test_size
                    'mRNA_end', 'full_mrna', 'site_start']
 
     if f0_pos == f1_pos:  # one organism. normal case.
-        pos = pd.read_csv(f0_pos)
+        pos = pd.read_excel(f0_pos)
         # featurelist = getFeatures50('D:\\ISE-BGU\\project\\mirnaProject\\lists\\test')
         # pos = pd.DataFrame(pos, columns=featurelist)
-        neg = pd.read_csv(f0_neg)
+        neg = pd.read_excel(f0_neg)
         # neg = pd.DataFrame(neg, columns=featurelist)
         X = pd.concat([pos, neg])
         X.reset_index(drop=True, inplace=True)
@@ -174,10 +177,10 @@ def train_test_prepare(featureSelection, pos_files, list_of_neg_files, test_size
         return X_train, X_test, y_train.values.ravel(), y_test.values.ravel()
 
     else:  # train is f0 and test is f1 (each is done on a different organism)
-        pos_train = pd.read_csv(f0_pos)
-        neg_train = pd.read_csv(f0_neg)
-        pos_test = pd.read_csv(f1_pos)
-        neg_test = pd.read_csv(f1_neg)
+        pos_train = pd.read_excel(f0_pos)
+        neg_train = pd.read_excel(f0_neg)
+        pos_test = pd.read_excel(f1_pos)
+        neg_test = pd.read_excel(f1_neg)
 
         X_train = pd.concat([pos_train, neg_train])
         X_train.reset_index(drop=True, inplace=True)
@@ -214,7 +217,7 @@ def train_test_prepare(featureSelection, pos_files, list_of_neg_files, test_size
 
 
 # run the machine learning algorithm
-def model_run(training_config, train_X, test_x, train_y, test_y, scoring="accuracy"):
+def model_run(training_config, train_X, test_x, train_y, test_y,json_name, scoring="accuracy"):
     best_est = []
     exp_to_run = training_config.keys()
     results = {'name': [], 'f1': [], 'accuracy': []}
@@ -236,6 +239,7 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring="accura
         print('Best classifier:', repr(best_clf))
         model = best_clf.fit(train_X, train_y)
         pred_y = model.predict(test_x)
+        shap_features(model, train_X, json_name)
 
         f1 = f1_score(test_y, pred_y)
         acc = accuracy_score(test_y, pred_y)
@@ -249,7 +253,7 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring="accura
                                                columns=['importance'])
 
             a = feature_importances.sort_values('importance', ascending=False)
-            # a.to_excel("featuresList_human_Mapping.xlsx")
+            a.to_excel("featuresList_"+json_name+".xlsx")
             print(a.head(10))
             JsonLog.add_to_json("{}_feature_importances".format(name), a.to_dict())
 
@@ -263,9 +267,9 @@ def model_run(training_config, train_X, test_x, train_y, test_y, scoring="accura
 
 
 def main():
-    log_dir = Path("D:\\ISE-BGU\\project\\mirnaProject\\Data")  # location of saved results logs
-    input_pos = Path("D:\\ISE-BGU\\project\\mirnaProject\\Data\\pos")  # location of positive data
-    input_neg = Path("D:\\ISE-BGU\\project\\mirnaProject\\Data\\neg")  # location of negative data
+    log_dir = Path("C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\Data")  # location of saved results logs
+    input_pos = Path("C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\Data\\pos")  # location of positive data
+    input_neg = Path("C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\Data\\neg")  # location of negative data
     all_neg = list(input_neg.iterdir())  # make list of all negative files
     all_pos = list(input_pos.iterdir())  # make list of all positive files
     all_pos_valid = [x for x in all_pos if x.match("*_pos_valid_seeds_*")]  # choose all valid seeds
@@ -275,17 +279,17 @@ def main():
     vienna_all_options = list(itertools.product(all_pos_vienna, all_pos_vienna))
 
     training_config = {
-        # 'rf': {
-        #     'clf': RandomForestClassifier(),
-        #     'parameters': {
-        #         'n_estimators': [10, 50, 200, 500],
-        #         'criterion': ['gini', 'entropy'],
-        #         'max_depth': [2, 4, 10, 20],
-        #         'min_samples_leaf': [2, 3],
-        #     },
-        #     'n_jobs': 4,
-        #     'one_hot': False
-        # },
+        'rf': {
+            'clf': RandomForestClassifier(),
+            'parameters': {
+                'n_estimators': [10, 50, 200, 500],
+                'criterion': ['gini', 'entropy'],
+                'max_depth': [2, 4, 10, 20],
+                'min_samples_leaf': [2, 3],
+            },
+            'n_jobs': 4,
+            'one_hot': False
+        },
         # 'rbf Kernel': {
         #            'clf': SVC(),
         #            'parameters': {'kernel': ['rbf'], 'gamma': [1e-3, 1e-4, 1e-4, 1e-5],
@@ -298,22 +302,22 @@ def main():
         #              'C': list(np.arange(0.5, 8.0, 0.1))}
         #
         #  }
-        'Xgb_boost': {
-            'clf': xgb.XGBClassifier(),
-            'parameters': {'nthread': [4],
-                           'objective': ['binary:logistic'],
-                           'learning_rate': [0.05],
-                           'max_depth': [6],
-                           'min_child_weight': [11],
-                           'silent': [1],
-                           'subsample': [0.8],
-                           'colsample_bytree': [0.7],
-                           'n_estimators': [5],  #
-                           'missing': [-999],
-                           'seed': [1337]},
-            'n_jobs': 2,
-            'one_hot': False
-        }
+        # 'Xgb_boost': {
+        #     'clf': xgb.XGBClassifier(),
+        #     'parameters': {'nthread': [4],
+        #                    'objective': ['binary:logistic'],
+        #                    'learning_rate': [0.05],
+        #                    'max_depth': [6],
+        #                    'min_child_weight': [11],
+        #                    'silent': [1],
+        #                    'subsample': [0.8],
+        #                    'colsample_bytree': [0.7],
+        #                    'n_estimators': [5],  #
+        #                    'missing': [-999],
+        #                    'seed': [1337]},
+        #     'n_jobs': 2,
+        #     'one_hot': False
+        # }
     }
     dm = "vienna"  # duplex method
 
@@ -335,9 +339,8 @@ def main():
         X_train, X_test, y_train, y_test = train_test_prepare('no', files_pair, all_neg, test_size=0.2, r_state=42)
         JsonLog.add_to_json("train size", X_train.shape[0])
         JsonLog.add_to_json("test size", X_test.shape[0])
-        best_est = model_run(training_config, X_train, X_test, y_train, y_test, scoring="accuracy")
+        best_est = model_run(training_config, X_train, X_test, y_train, y_test,json_name, scoring="accuracy")
         # makeImportanceList(files_pair,all_neg)
-
 
 def intersectList(path, list1, list2):
     dfHuman = pd.read_excel(path + '\\' + list1 + '.xlsx')
@@ -412,8 +415,8 @@ def intersection_ExcelFiles(path):
 
 if __name__ == "__main__":
     # main()
-    df = pd.read_excel('C:\\Users\\yaels\\Desktop\\Celegans_Pairing_Beyond_Seed_Data_20190405-112157_20190405-112623_vienna_pos_valid_seeds_20190410-022628.xlsx')
-    print(df['Seed_match_compact_A'].dtype)
-# intersectList()
-# commonFeatures('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
-# multipleIntersection('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists')
+    # df = pd.read_excel('C:\\Users\\yaels\\Desktop\\Celegans_Pairing_Beyond_Seed_Data_20190405-112157_20190405-112623_vienna_pos_valid_seeds_20190410-022628.xlsx')
+    # print(df['Seed_match_compact_A'].dtype)
+    # intersectList()
+    # commonFeatures('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists2')
+    multipleIntersection('C:\\Users\\sheinbey\\PycharmProjects\\mirnaProject\\lists2')
